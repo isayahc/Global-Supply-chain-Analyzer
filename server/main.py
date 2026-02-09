@@ -79,7 +79,7 @@ def get_supply_chain(product_name: str):
     - nodes (list of companies with name, role, and location_query)
     """
 
-    model = genai.GenerativeModel('gemini-3-flash-preview')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     response = model.generate_content(
         prompt,
         generation_config=genai.GenerationConfig(
