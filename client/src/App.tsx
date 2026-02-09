@@ -29,6 +29,21 @@ interface CompanyLocation {
   coordinates: Coordinates;
 }
 
+// New Types for Supply Chain
+interface SupplyChainNode {
+  company_name: string;
+  role: string;
+  location_query: string;
+  found: boolean;
+  address?: string;
+  coordinates?: Coordinates;
+}
+
+interface SupplyChainData {
+  product: string;
+  supply_chain: SupplyChainNode[];
+}
+
 function App() {
   // ==========================================
   // State: Recipe Generator
@@ -44,6 +59,14 @@ function App() {
   const [location, setLocation] = useState<CompanyLocation | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState('');
+
+  // ==========================================
+  // State: Supply Chain X-Ray
+  // ==========================================
+  const [productQuery, setProductQuery] = useState('');
+  const [chainData, setChainData] = useState<SupplyChainData | null>(null);
+  const [chainLoading, setChainLoading] = useState(false);
+  const [chainError, setChainError] = useState('');
 
   // ==========================================
   // Function 1: Get Recipe (Gemini)
@@ -89,7 +112,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           company_name: companyQuery,
-          city: '' // Optional: You could add a second input for city
+          city: ''
         })
       });
 
@@ -105,6 +128,36 @@ function App() {
       setLocError('Could not find that company.');
     } finally {
       setLocLoading(false);
+    }
+  };
+
+  // ==========================================
+  // Function 3: Supply Chain Analysis (Gemini + Maps)
+  // ==========================================
+  const getSupplyChain = async () => {
+    if (!productQuery) return;
+
+    setChainLoading(true);
+    setChainError('');
+    setChainData(null);
+
+    try {
+      // Note: Make sure your Python backend expects 'product_name' query param
+      // OR update this to send a JSON body if you changed your backend.
+      // This assumes: @app.post("/api/supply-chain") def get_supply_chain(product_name: str):
+      const response = await fetch(`/api/supply-chain?product_name=${encodeURIComponent(productQuery)}`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) throw new Error('Failed to analyze supply chain');
+
+      const data = await response.json();
+      setChainData(data);
+    } catch (err) {
+      console.error(err);
+      setChainError('Failed to analyze supply chain.');
+    } finally {
+      setChainLoading(false);
     }
   };
 
@@ -144,7 +197,7 @@ function App() {
       {/* =======================================================
           TOOL 2: COMPANY LOCATOR
       ======================================================== */}
-      <div className="card" style={{ border: '1px solid #444', padding: '20px', borderRadius: '12px' }}>
+      <div className="card" style={{ border: '1px solid #444', padding: '20px', marginBottom: '40px', borderRadius: '12px' }}>
         <h2>📍 Company Locator (Google Maps)</h2>
         <p style={{ color: '#aaa', fontSize: '0.9rem' }}>Finds the exact coordinates of any business.</p>
 
@@ -176,7 +229,6 @@ function App() {
               </div>
             </div>
             
-            {/* Link to open in real Google Maps */}
             <a 
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.name + ' ' + location.address)}`} 
               target="_blank" 
@@ -185,6 +237,65 @@ function App() {
             >
               Open in Google Maps →
             </a>
+          </div>
+        )}
+      </div>
+
+      {/* =======================================================
+          TOOL 3: SUPPLY CHAIN X-RAY
+      ======================================================== */}
+      <div className="card" style={{ border: '1px solid #444', padding: '20px', borderRadius: '12px' }}>
+        <h2>📦 Supply Chain X-Ray</h2>
+        <p style={{ color: '#aaa', fontSize: '0.9rem' }}>Gemini identifies the companies. Google Maps finds them.</p>
+
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
+          <input 
+            type="text" 
+            placeholder="e.g. iPhone 15 Pro"
+            value={productQuery}
+            onChange={(e) => setProductQuery(e.target.value)}
+            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #666', width: '60%' }}
+          />
+          <button onClick={getSupplyChain} disabled={chainLoading || !productQuery}>
+            {chainLoading ? 'Analyzing...' : 'X-Ray'}
+          </button>
+        </div>
+
+        {chainError && <p style={{ color: 'red' }}>{chainError}</p>}
+
+        {chainData && (
+          <div style={{ display: 'grid', gap: '10px', textAlign: 'left' }}>
+            <h3 style={{ textAlign: 'center', marginTop: 0 }}>Supply Chain for: {chainData.product}</h3>
+            {chainData.supply_chain.map((node, i) => (
+              <div key={i} style={{ 
+                background: '#222', 
+                padding: '15px', 
+                borderRadius: '8px', 
+                borderLeft: node.found ? '4px solid #4ade80' : '4px solid #ef4444' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: '1.1rem' }}>{node.company_name}</strong>
+                  <span style={{ fontSize: '0.8rem', background: '#444', padding: '2px 8px', borderRadius: '4px' }}>
+                    {node.role}
+                  </span>
+                </div>
+                
+                <p style={{ margin: '8px 0', fontSize: '0.9rem', color: '#ccc' }}>
+                  {node.found ? `📍 ${node.address}` : '❌ Location not found'}
+                </p>
+
+                {node.found && node.coordinates && (
+                  <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${node.coordinates.lat},${node.coordinates.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: '0.85rem', color: '#4ade80', textDecoration: 'none' }}
+                  >
+                    View on Map ↗
+                  </a>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

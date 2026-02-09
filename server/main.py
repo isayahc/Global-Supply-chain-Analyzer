@@ -11,7 +11,9 @@ from pydantic import BaseModel
 from typing import List
 import os
 from dotenv import load_dotenv
-from schemas import Recipe, RecipeRequest, LocationRequest
+from schemas import Recipe, RecipeRequest, LocationRequest, SupplyChainNode, SupplyChainResponse
+from concurrent.futures import ThreadPoolExecutor
+import json
 
 # Load env variables (Make sure you have python-dotenv installed)
 load_dotenv()
@@ -20,9 +22,31 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gmaps = googlemaps.Client(key=os.getenv("MAPS_API_KEY"))
 
-# Define the model (Use 'gemini-1.5-flash' or 'gemini-2.0-flash' for speed)
-# model = genai.GenerativeModel('gemini-1.5-flash')
+# Define the model (Use 'gemini-2.0-flash' for speed)
 model = genai.GenerativeModel('gemini-2.5-flash')
+
+# This looks up a single company on Google Maps
+def get_coords_for_node(node: SupplyChainNode):
+    try:
+        # We use the text search we built earlier
+        places_result = gmaps.places(query=node.location_query)
+        
+        if places_result['status'] == 'OK' and places_result['results']:
+            top_result = places_result['results'][0]
+            coords = top_result['geometry']['location']
+            address = top_result['formatted_address']
+            return {
+                **node.dict(),
+                "found": True,
+                "coordinates": coords,
+                "address": address
+            }
+    except Exception as e:
+        print(f"Error finding {node.company_name}: {e}")
+    
+    # Fallback if not found
+    return {**node.dict(), "found": False, "coordinates": None, "address": "Unknown"}
+
 
 app = FastAPI()
 
@@ -126,4 +150,41 @@ def get_company_coordinates(request: LocationRequest):
         "address": address,
         "coordinates": location,
         "place_id": top_result['place_id'] # Useful if you want to save it
+    }
+
+# --- NEW ENDPOINT ---
+@app.post("/api/supply-chain")
+def get_supply_chain(product_name: str): # Expects simple string query param or body
+    # 1. Ask Gemini who makes the parts
+    prompt = f"""
+    Analyze the supply chain for: {product_name}.
+    Identify 5 major distinct companies involved in its production (raw materials, components, manufacturing).
+    For each, provide:
+    1. Company Name
+    2. Specific Role (e.g. 'OLED Screen Supplier')
+    3. A search string for their likely headquarters or main factory (e.g. 'Samsung Display Asan Campus').
+    """
+
+    # 2. Get Structured Data from Gemini
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    response = model.generate_content(
+        prompt,
+        generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            response_schema=SupplyChainResponse
+        )
+    )
+    
+    chain_data = json.loads(response.text)
+    nodes = [SupplyChainNode(**node) for node in chain_data['nodes']]
+
+    # 3. "Ground" the data with Google Maps
+    # We use a ThreadPool to look up all 5 companies at once (fast!)
+    enriched_nodes = []
+    with ThreadPoolExecutor() as executor:
+        enriched_nodes = list(executor.map(get_coords_for_node, nodes))
+
+    return {
+        "product": chain_data['product'],
+        "supply_chain": enriched_nodes
     }
