@@ -1,0 +1,10 @@
+# Ignore git
+.git
+
+# Ignore backend venv
+server/venv
+server/__pycache__
+
+# Ignore frontend node_modules
+client/node_modules
+client/dist

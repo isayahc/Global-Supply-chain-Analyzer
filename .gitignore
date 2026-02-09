@@ -1,0 +1,71 @@
+# =========================
+# General / OS
+# =========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# =========================
+# Python (Backend)
+# =========================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Environment Variables (CRITICAL: Never commit API keys!)
+.env
+.env.*
+
+# Distribution / Packaging
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Node/Bun (Frontend)
+# =========================
+# Dependencies
+node_modules/
+
+# Production Build Output
+client/dist/
+
+# Local Environment Variables
+client/.env.local
+client/.env.development.local
+client/.env.test.local
+client/.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Docker
+# =========================
+# If you ever use docker-compose overrides
+docker-compose.override.yml
