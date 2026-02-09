@@ -6,11 +6,17 @@ FROM oven/bun:1 AS frontend-builder
 WORKDIR /app/client
 
 # Copy frontend files
-# COPY client/package.json client/bun.lockb ./
 COPY client/package.json client/bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY client/ .
+
+# === FIX STARTS HERE ===
+# Accept the variable from Railway
+ARG VITE_MAPS_API_KEY
+# Make it available to the build command
+ENV VITE_MAPS_API_KEY=$VITE_MAPS_API_KEY
+# === FIX ENDS HERE ===
 
 # Build the static files (creates /dist folder)
 RUN bun run build
