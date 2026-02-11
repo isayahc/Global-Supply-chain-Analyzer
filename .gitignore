@@ -23,6 +23,7 @@ env/
 # Environment Variables (CRITICAL: Never commit API keys!)
 .env
 .env.*
+!.env.example
 
 # Distribution / Packaging
 build/
